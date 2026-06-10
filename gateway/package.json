@@ -1,0 +1,17 @@
+{
+  "name": "aquacontrol-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "mqtt": "^5.14.1",
+    "uuid": "^11.1.0"
+  }
+}

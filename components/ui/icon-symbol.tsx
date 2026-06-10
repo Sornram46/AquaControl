@@ -20,6 +20,7 @@ const MAPPING = {
   "house.fill": "home",
   "paperplane.fill": "send",
   "qrcode.viewfinder": "qr-code-scanner",
+  "plus.circle.fill": "add-circle",
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
 } as IconMapping;

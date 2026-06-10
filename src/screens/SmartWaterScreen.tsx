@@ -1,7 +1,13 @@
 import { useThemePreference } from "@/src/contexts/theme-preference";
-import { router } from "expo-router";
-import { useState } from "react";
 import {
+    getDeviceState,
+    sendRelayCommand,
+    type RelayControlKey,
+} from "@/src/services/control-gateway";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+    Alert,
     Pressable,
     SafeAreaView,
     StyleSheet,
@@ -37,7 +43,7 @@ const paletteByMode = {
   },
 } as const;
 
-type ControlKey = "pump" | "aerator" | "feeder" | "uv";
+type ControlKey = RelayControlKey;
 
 const controlItems: Array<{
   key: ControlKey;
@@ -74,6 +80,7 @@ const controlItems: Array<{
 export default function SmartWaterScreen() {
   const { themeMode } = useThemePreference();
   const palette = paletteByMode[themeMode];
+  const deviceId = process.env.EXPO_PUBLIC_DEVICE_ID ?? "device-001";
 
   const [controlState, setControlState] = useState<Record<ControlKey, boolean>>(
     {
@@ -83,11 +90,62 @@ export default function SmartWaterScreen() {
       uv: false,
     },
   );
+  const [pendingControls, setPendingControls] = useState<
+    Record<ControlKey, boolean>
+  >({
+    pump: false,
+    aerator: false,
+    feeder: false,
+    uv: false,
+  });
+  const [syncingState, setSyncingState] = useState(false);
 
-  const onToggleControl = (key: ControlKey, value: boolean) => {
+  const syncStateFromGateway = async () => {
+    setSyncingState(true);
+    try {
+      const state = await getDeviceState(deviceId);
+      setControlState((prev) => ({
+        ...prev,
+        ...state.controls,
+      }));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "ไม่สามารถโหลดสถานะอุปกรณ์ได้";
+      Alert.alert("ซิงก์สถานะไม่สำเร็จ", message);
+    } finally {
+      setSyncingState(false);
+    }
+  };
+
+  useEffect(() => {
+    syncStateFromGateway();
+  }, []);
+
+  const onToggleControl = async (key: ControlKey, value: boolean) => {
+    if (pendingControls[key]) {
+      return;
+    }
+
+    const previous = controlState[key];
     setControlState((prev) => ({ ...prev, [key]: value }));
-    // TODO: Replace with API/MQTT call to your board + relay.
-    // Example payload: { control: key, enabled: value }
+    setPendingControls((prev) => ({ ...prev, [key]: true }));
+
+    try {
+      await sendRelayCommand({
+        deviceId,
+        control: key,
+        enabled: value,
+      });
+    } catch (error) {
+      setControlState((prev) => ({ ...prev, [key]: previous }));
+      const message =
+        error instanceof Error
+          ? error.message
+          : "ไม่สามารถส่งคำสั่งไปยังบอร์ดได้";
+      Alert.alert("สั่งงานไม่สำเร็จ", message);
+    } finally {
+      setPendingControls((prev) => ({ ...prev, [key]: false }));
+    }
   };
 
   return (
@@ -97,6 +155,19 @@ export default function SmartWaterScreen() {
       <View style={styles.contentWrap}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>กลับหน้า Dashboard</Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.refreshButton,
+            syncingState ? styles.refreshButtonDisabled : null,
+          ]}
+          onPress={syncStateFromGateway}
+          disabled={syncingState}
+        >
+          <Text style={styles.refreshButtonText}>
+            {syncingState ? "กำลังซิงก์สถานะ..." : "รีเฟรชสถานะอุปกรณ์"}
+          </Text>
         </Pressable>
 
         <Text style={[styles.title, { color: palette.title }]}>
@@ -144,6 +215,7 @@ export default function SmartWaterScreen() {
         <View style={styles.controlsGrid}>
           {controlItems.map((item) => {
             const isOn = controlState[item.key];
+            const isPending = pendingControls[item.key];
 
             return (
               <View
@@ -173,10 +245,11 @@ export default function SmartWaterScreen() {
                       { color: isOn ? palette.buttonBg : palette.dangerBg },
                     ]}
                   >
-                    {isOn ? "ON" : "OFF"}
+                    {isPending ? "SYNC" : isOn ? "ON" : "OFF"}
                   </Text>
                   <Switch
                     value={isOn}
+                    disabled={isPending}
                     onValueChange={(value) => onToggleControl(item.key, value)}
                     trackColor={{ false: "#9AAABD", true: "#35B387" }}
                     thumbColor={isOn ? "#FFFFFF" : "#F4F4F4"}
@@ -209,6 +282,22 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   backButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  refreshButton: {
+    alignSelf: "flex-start",
+    marginBottom: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: "#315779",
+  },
+  refreshButtonDisabled: {
+    opacity: 0.6,
+  },
+  refreshButtonText: {
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 12,

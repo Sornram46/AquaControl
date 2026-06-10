@@ -249,12 +249,17 @@ export default function DashboardScreen() {
             <Pressable
               key={tile.id}
               onPress={() => onTilePress(tile.route)}
-              style={[
+              android_ripple={{
+                color: "rgba(255,255,255,0.35)",
+                borderless: false,
+              }}
+              style={({ pressed }) => [
                 styles.tileCard,
                 {
                   borderColor: tile.accent,
                   backgroundColor: tile.background,
                 },
+                pressed ? styles.tileCardPressed : null,
               ]}
             >
               <View
@@ -345,6 +350,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
+    shadowColor: "#15314A",
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    elevation: 4,
+  },
+  tileCardPressed: {
+    transform: [{ scale: 0.97 }],
+    shadowOpacity: 0.05,
+    elevation: 1,
   },
   tileIconWrap: {
     width: 46,
