@@ -5,7 +5,7 @@ import {
     type RelayControlKey,
 } from "@/src/services/control-gateway";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     Alert,
     Pressable,
@@ -44,13 +44,14 @@ const paletteByMode = {
 } as const;
 
 type ControlKey = RelayControlKey;
+type SyncStatus = "idle" | "syncing" | "success";
 
-const controlItems: Array<{
+const controlItems: {
   key: ControlKey;
   icon: string;
   title: string;
   subtitle: string;
-}> = [
+}[] = [
   {
     key: "pump",
     icon: "🚰",
@@ -98,28 +99,29 @@ export default function SmartWaterScreen() {
     feeder: false,
     uv: false,
   });
-  const [syncingState, setSyncingState] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const syncingState = syncStatus === "syncing";
 
-  const syncStateFromGateway = async () => {
-    setSyncingState(true);
+  const syncStateFromGateway = useCallback(async () => {
+    setSyncStatus("syncing");
     try {
       const state = await getDeviceState(deviceId);
       setControlState((prev) => ({
         ...prev,
         ...state.controls,
       }));
+      setSyncStatus("success");
     } catch (error) {
+      setSyncStatus("idle");
       const message =
         error instanceof Error ? error.message : "ไม่สามารถโหลดสถานะอุปกรณ์ได้";
       Alert.alert("ซิงก์สถานะไม่สำเร็จ", message);
-    } finally {
-      setSyncingState(false);
     }
-  };
+  }, [deviceId]);
 
   useEffect(() => {
     syncStateFromGateway();
-  }, []);
+  }, [syncStateFromGateway]);
 
   const onToggleControl = async (key: ControlKey, value: boolean) => {
     if (pendingControls[key]) {
@@ -161,12 +163,17 @@ export default function SmartWaterScreen() {
           style={[
             styles.refreshButton,
             syncingState ? styles.refreshButtonDisabled : null,
+            syncStatus === "success" ? styles.refreshButtonSuccess : null,
           ]}
           onPress={syncStateFromGateway}
           disabled={syncingState}
         >
           <Text style={styles.refreshButtonText}>
-            {syncingState ? "กำลังซิงก์สถานะ..." : "รีเฟรชสถานะอุปกรณ์"}
+            {syncStatus === "syncing"
+              ? "กำลังซิงก์สถานะ..."
+              : syncStatus === "success"
+                ? "เชื่อมต่อสำเร็จ"
+                : "รีเฟรชสถานะอุปกรณ์"}
           </Text>
         </Pressable>
 
@@ -296,6 +303,9 @@ const styles = StyleSheet.create({
   },
   refreshButtonDisabled: {
     opacity: 0.6,
+  },
+  refreshButtonSuccess: {
+    backgroundColor: "#1F8E6E",
   },
   refreshButtonText: {
     color: "#FFFFFF",

@@ -87,17 +87,6 @@ const featureTiles = [
   },
 ];
 
-const onSignOut = async () => {
-  const { error } = await supabaseClient.auth.signOut();
-
-  if (error) {
-    Alert.alert("ออกจากระบบไม่สำเร็จ", error.message);
-    return;
-  }
-
-  router.replace("/login");
-};
-
 export default function DashboardScreen() {
   const { themeMode, setThemeMode } = useThemePreference();
   const [profile, setProfile] = useState<Profile | null>(null);
